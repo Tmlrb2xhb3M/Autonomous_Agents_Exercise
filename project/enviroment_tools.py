@@ -1,57 +1,15 @@
 from typing import Dict, List, Any
 from smolagents import tool
-
-WORLD_STATE = {
-    "nodes":{
-        "Pipe_40":{
-            "type": "water",
-            "area": "District_B",
-            "population_affected" : 500,
-            "criticality" : "Medium",
-            "status" : "failed"
-        },
-        "Pipe_20":{
-            "type": "water",
-            "area": "District_A",
-            "population_affected" : 1000,
-            "criticality" : "High",
-            "status" : "failed"
-        },
-        "Server_A":{
-            "type": "network",
-            "area": "DataCenter_1",
-            "population_affected" : 2000,
-            "criticality" : "High",
-            "status" : "failed"
-        },
-        "Tower_3":{
-            "type": "telecom",
-            "area": "District_C",
-            "population_affected" : 1500,
-            "criticality" : "Low",
-            "status" : "working"
-        }
-    },
-    "crews":{
-        "Crew_A": {
-            "skills": ["water"],
-            "availability": True,
-            "current_node": None
-        },
-        "Crew_B": {
-            "skills": ["network","telecom"],
-            "availability": True,
-            "current_node": None
-        },"Crew_C": {
-            "skills": ["water", "telecom"],
-            "availability": False,
-            "current_node": "Pipe_5"
-        }
-    }
-}
+from world import WORLD_STATE
 
 @tool
 def detect_failure_nodes() -> List[str]:
+    """
+    Returns a list of node IDs that are currently in failure state.
+    The agent uses this to detect which infrastructure elements need repair.
+    Returns:
+        list of str: IDs of nodes with status 'failed'.
+    """
     global WORLD_STATE
     failed = [
         node_id
@@ -59,13 +17,21 @@ def detect_failure_nodes() -> List[str]:
         if info["status"] == "failed"
     ]
     return failed
-"""
-Επιστρέφει μια λίστα με τα IDs των nodes που είναι αυτή την στιγμή failed
-status.
-"""
 
 @tool
 def estimate_impact(node_id: str) -> Dict[str, object]:
+    """
+    Estimates the social and operational impact of a failed node.
+    Args:
+        node_id: The identifier of the node (e.g., 'Pipe_42', 'Server_B').
+    Returns:
+        dict: Metrics describing impact, for example:
+            {
+                "population_affected": int,
+                "criticality": "Low" | "Medium" | "High"
+            }
+        If the node does not exist, returns a dict with an 'error' field.
+    """
     global WORLD_STATE
     node = WORLD_STATE["nodes"].get(node_id)
     if node is None:
@@ -74,19 +40,37 @@ def estimate_impact(node_id: str) -> Dict[str, object]:
         "population_affected": node["population_affected"],
         "criticality": node["criticality"]
     }
-"""
-Εκτιμεί το impact που έχει ένα failed node.
-Παίρνει τα IDs των nodes.
-Επιστρέφει το population_affected και το criticality.
-Αν δεν υπάρχει το node αυτό που ψάχνουμε επιστρέφει error.
-"""
 
 @tool
 def assign_repair_crew(node_ids: List[str], crew_ids: List[str]) -> Dict[str,Any]:
+    """
+    Assigns repair crews to failed nodes and updates the global world state.
+    
+    IMPORTANT: This permanently changes crew availability and node status until 
+    manually reset or future repair completion logic is implemented.
+    
+    Args:
+        node_ids: List of node IDs that should be repaired (e.g., ["Pipe_42", "Server_B"]).
+        crew_ids: List of crew IDs to assign (must match node_ids in length).
+    
+    Returns:
+        dict: Contains:
+            - "assignments": dict of successful crew_id -> node_id mappings
+            - "total_estimated_time": int (hours)
+            - "failures": list of failure reasons
+            - "updated_crews": list of affected crew IDs (now unavailable)
+            - "updated_nodes": list of nodes now "in_repair"
+    
+    Example:
+        assign_repair_crew(["Pipe_42"], ["Crew_A"]) 
+        -> {"assignments": {"Crew_A": "Pipe_42"}, "updated_crews": ["Crew_A"]}
+    """
     global WORLD_STATE
     assignments = {}
     failures = []
     total_time = 0
+    updated_crews = []
+    updated_nodes = []
     for crew_id, node_id in zip(crew_ids, node_ids):
         crew = WORLD_STATE["crews"].get(crew_id)
         node = WORLD_STATE["nodes"].get(node_id)
@@ -108,21 +92,20 @@ def assign_repair_crew(node_ids: List[str], crew_ids: List[str]) -> Dict[str,Any
         crew["current_node"] = node_id
         node["status"] = "in_repair"
 
-        base_time = 2
+        updated_crews.append(crew_id)
+        updated_nodes.append(node_id)
+
+        base_time = 3
         if node["criticality"] == "High":
-            base_time = 4
+            base_time += 2
         elif node["criticality"] == "Medium":
-            base_time = 3
+            base_time += 1
         total_time += base_time
     
     return{
         "assignments": assignments, 
         "total_estimated_time": total_time,
-        "failures": failures
+        "failures": failures,
+        "updated_crews": updated_crews,
+        "updated_nodes": updated_nodes
     }
-"""
-Ορίζει repair crews σε failed nodes και ενημερώνει την global μεταβλητη WORLD_STATE.
-Η συνάρτηση παίρνει τα IDs των nodes και των repair crews.
-Επιστρέφει τα IDs των nodes που έγιναν assigned στο αντιστοιχο repair crew,
-το συνολικό estimated_time και τα failures.
-"""
