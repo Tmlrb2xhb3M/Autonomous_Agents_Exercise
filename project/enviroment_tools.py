@@ -10,11 +10,12 @@ def detect_failure_nodes() -> List[str]:
     Returns:
         list of str: IDs of nodes with status 'failed'.
     """
+    step_simulation_time()
     global WORLD_STATE
     failed = [
         node_id
-        for node_id, info in WORLD_STATE["nodes"].items()
-        if info["status"] == "failed"
+        for node_id, node in WORLD_STATE["nodes"].items()
+        if node["status"] == "failed"
     ]
     return failed
 
