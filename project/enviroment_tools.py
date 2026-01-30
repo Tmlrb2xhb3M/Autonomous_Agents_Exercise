@@ -112,5 +112,23 @@ def assign_repair_crew(node_ids: List[str], crew_ids: List[str]) -> Dict[str,Any
         "total_estimated_time": total_time,
         "failures": failures,
         "updated_crews": updated_crews,
-        "updated_nodes": updated_nodes
+        "updated_nodes": updated_nodes,
+        "simulation_time": WORLD_STATE["simulation_time"]
     }
+
+def step_simulation_time():
+
+    global WORLD_STATE
+    WORLD_STATE["simulation_time"] += 1
+    for node_id, node in WORLD_STATE["nodes"].items():
+        if(node["status"] == "in_repair" and WORLD_STATE["simulation_time"] >= node["repair_start_time"] + node["repair_duration"]):
+            crew_id = None
+            for c_id, crew in WORLD_STATE["crews"].items():
+                if crew["current_node"] == node_id:
+                    crew["availability"] = True
+                    crew["current_node"] = None
+                    crew["assigned_at"] = None
+                    crew_id = c_id
+                    break
+            node["status"] = "repaired"
+            print(f"[{WORLD_STATE['simulation_time']}] Repair complete: {node_id} by {crew_id}")

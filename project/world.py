@@ -1,6 +1,5 @@
 WORLD_STATE = {
     "simulation_time": 0,
-
     "nodes":{
         "Pipe_40":{
             "type": "water",
