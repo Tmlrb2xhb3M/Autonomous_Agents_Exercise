@@ -1,5 +1,5 @@
 from enum import Enum
-from enviroment_tools import assign_repair_crew, estimate_impact, detect_failure_nodes
+from enviroment_tools import TOOL_REGISTRY
 from smolagents import  InferenceClientModel
 import smolagents
 
@@ -50,12 +50,6 @@ ALLOWED_ACTIONS_BY_STATE = {
     {
         ("final", "FINAL")
     }
-}
-
-TOOL_REGISTRY = {
-    "detect_failure_nodes": detect_failure_nodes,
-    "estimate_impact": estimate_impact,
-    "assign_repair_crew": assign_repair_crew
 }
 
 class Agent:
