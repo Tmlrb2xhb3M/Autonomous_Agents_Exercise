@@ -11,9 +11,24 @@ class State(Enum):
     VALIDATE=4
     FINAL=5
 
-ALLOWED_ACTION_TYPES = {"tool", "transition", "final"}
+ALLOWED_ACTION_TYPES = {
+    "tool",
+    "transition",
+    "final"
+}
 
-ALLOWED_BY_STATE = {
+ALLOWED_TRANSITIONS = {
+    "GO_FAILURE_DETECTION",
+    "GO_IMPACT_ANALYSIS",
+    "GO_REPAIR_PLANNING",
+    "GO_VALIDATE",
+    "GO_FINAL"
+}
+
+ALLOWED_ACTIONS_BY_STATE = {
+    State.INIT: {
+        ("transition", "GO_FAILURE_DETECTION")
+    },
     State.FAILURE_DETECTION: {
         ("tool", "detect_failure_nodes"),
         ("tool", "estimate_impact"),
@@ -26,7 +41,21 @@ ALLOWED_BY_STATE = {
         ("tool", "assign_repair_crew"),
         ("transition", "GO_IMPACT_ANALYSIS"),
         ("transition", "GO_VALIDATE"),
+    },
+    State.VALIDATE: {
+        ("transition", "GO_REPAIR_PLANNING"),
+        ("transition", "GO_FINAL")
+    },
+    State.FINAL: 
+    {
+        ("final", "FINAL")
     }
+}
+
+TOOL_REGISTRY = {
+    "detect_failure_nodes": detect_failure_nodes,
+    "estimate_impact": estimate_impact,
+    "assign_repair_crew": assign_repair_crew
 }
 
 class Agent:
@@ -95,5 +124,58 @@ class Agent:
     def validate_solution():
         pass
 
+    def route_decision(self, decision):
+        action_type=decision.get("action_type")
+        action=decision.get("action")
+
+        if action_type not in ALLOWED_ACTION_TYPES:
+            return {
+                "ok":False, 
+                "action_type": action_type,
+                "error": f"Action type {action_type} not on allowed action types.",
+                "observation": {"safe state": True}
+            }
+
+        if (action_type, action) not in ALLOWED_ACTIONS_BY_STATE:
+            return {
+                "ok": False,
+                action_type: action,
+                "error": f"Action '{action}' not allowed in state '{self.state}'.",
+                "observation": {"safe state", True}
+            }
+        
+        if action_type == "transition":
+            if action not in ALLOWED_TRANSITIONS:
+                return {
+                    "ok": False,
+                    "transition": action,
+                    "error": f"Transition '{action}' not allowed in system.",
+                    "observation": {"safe state", True}
+                }
+            else:
+                return {
+                    "ok": True, 
+                    "transition": action,
+                    "error": "No error",
+                    "observation": {"transition": action}
+                }
+        
+        if action_type == "tool":
+            if action not in TOOL_REGISTRY:
+                return {
+                    "ok": False,
+                    "tool": action,
+                    "error": f"Action {action} not in tool registry.",
+                    "observation": {"safe state": True}
+                }
+
+        if action_type == "final":
+            return {
+                "ok": True,
+                "final": True,
+                "error": "No error",
+                "observation": "None"
+            }
+        
 agent = Agent(model=InferenceClientModel())
 agent.run()
