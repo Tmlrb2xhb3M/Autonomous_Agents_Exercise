@@ -133,3 +133,9 @@ def step_simulation_time():
                     break
             node["status"] = "repaired"
             print(f"[{WORLD_STATE['simulation_time']}] Repair complete: {node_id} by {crew_id}")
+
+TOOL_REGISTRY = {
+    "detect_failure_nodes": detect_failure_nodes,
+    "estimate_impact": estimate_impact,
+    "assign_repair_crew": assign_repair_crew
+}
