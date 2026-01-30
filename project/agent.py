@@ -3,6 +3,7 @@ from enviroment_tools import TOOL_REGISTRY
 from smolagents import  InferenceClientModel
 import json
 import prompts
+from world import WORLD_STATE
 
 class State(Enum):
     INIT=0
@@ -158,8 +159,18 @@ class Agent:
             elif self.state == State.FINAL:
                 break
 
-    def validate_solution():
-        pass
+    def validate_solution(self, decision: dict[str, any]) -> list[str]:
+        violations=[]
+
+        action_type=decision["action_type"]
+        action=decision["action"]
+        args=decision.get["arguements", {}] or {}
+
+        if action_type == "tool" and action == "assign_repair_crew":
+            if WORLD_STATE["crews"][args["crew_ids"]]["availability"] == False:
+                violations.append("Crew is unavailable")
+            
+        return violations
 
     def route_decision(self, decision):
         action_type=decision.get("action_type")
