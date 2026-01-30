@@ -110,8 +110,8 @@ def assign_repair_crew(node_ids: List[str], crew_ids: List[str]) -> Dict[str,Any
         "updated_nodes": updated_nodes
     }
 
-TOOL_REGISTRY = {
+# Tool Registries
+OBSERVER_TOOL_REGISTRY = {
     "detect_failure_nodes": detect_failure_nodes,
     "estimate_impact": estimate_impact,
-    "assign_repair_crew": assign_repair_crew
 }

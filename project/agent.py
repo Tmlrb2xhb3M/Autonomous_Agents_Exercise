@@ -30,15 +30,12 @@ ALLOWED_ACTIONS_BY_STATE = {
         ("transition", "GO_FAILURE_DETECTION")
     },
     State.FAILURE_DETECTION: {
-        ("tool", "detect_failure_nodes"),
-        ("tool", "estimate_impact"),
         ("transition", "GO_IMPACT_ANALYSIS"),
     },
     State.IMPACT_ANALYSIS: {
         ("transition", "GO_REPAIR_PLANNING")
     },
     State.REPAIR_PLANNING: {
-        ("tool", "assign_repair_crew"),
         ("transition", "GO_IMPACT_ANALYSIS"),
         ("transition", "GO_VALIDATE"),
     },
@@ -83,6 +80,10 @@ class Agent:
                 CONSTRAINT: Do not make a plan, just gather info.
                 """
                 response = self.model.generate(system_prompt)
+
+                # Validate response
+
+                # Add to History
                 self.state=State.IMPACT_ANALYSIS
                 continue
             
