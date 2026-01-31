@@ -13,35 +13,49 @@ model = OpenAIServerModel(
     temperature=0.2,
 )
 
-def llm_call(system_prompt: str, prompt: str, tools=[], messages=None, sliding_window = None, max_steps: int = 10):
-#->ToolCallingAgent.Result:
-    agent = ToolCallingAgent(
+class toolcallagentwrapper:
+    def init(self, model, tools):
+        self.agent = ToolCallingAgent(
         model=model,
         tools=tools,
         return_full_result=True,
         verbosity_level=LogLevel.ERROR
     )
+        
+    def run(self, prompt, steps):
+        result = self.agent.run(
+            prompt,
+            max_steps=steps,
+        )
+        return result
 
-    history = messages
+# def llm_call(system_prompt: str, prompt: str, tools=[], messages=None, sliding_window = None, max_steps: int = 10) -> ToolCallingAgent.Result:
+#     agent = ToolCallingAgent(
+#         model=model,
+#         tools=tools,
+#         return_full_result=True,
+#         verbosity_level=LogLevel.ERROR
+#     )
 
-    if messages is None:
-        history = []
+#     history = messages
 
-    if sliding_window is not None:
-        history = messages[-sliding_window:]
+#     if messages is None:
+#         history = []
 
-#
-    history_text = system_prompt + "\n\n"
-    for m in history:
-        role = m.get("role", "user").upper()
-        content = m.get("content", "")
-        history_text += f"{role}:\n{content}\n\n"
+#     if sliding_window is not None:
+#         history = messages[-sliding_window:]
 
-    full_prompt = history_text + "TASK:\n" + prompt
+#     history_text = system_prompt + "\n\n"
+#     for m in history:
+#         role = m.get("role", "user").upper()
+#         content = m.get("content", "")
+#         history_text += f"{role}:\n{content}\n\n"
 
-    result = agent.run(
-        full_prompt,
-        max_steps=max_steps,
-    )
+#     full_prompt = history_text + "TASK:\n" + prompt
 
-    return result
+#     result = agent.run(
+#         full_prompt,
+#         max_steps=max_steps,
+#     )
+
+#     return result

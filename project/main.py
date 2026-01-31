@@ -35,7 +35,6 @@ SCHEMA = {
     },
 }
 
-
 system_prompt = (
     "You are the Observer Agent responsible for managing city infrastructure failures.\n"
     "Your tasks include detecting failed nodes, estimating their impact\n"

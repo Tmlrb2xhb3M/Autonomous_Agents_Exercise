@@ -1,7 +1,7 @@
 from enum import Enum
 from enviroment_tools import TOOL_REGISTRY
 from smolagents import  InferenceClientModel
-import smolagents
+import json
 
 class State(Enum):
     INIT=0
@@ -10,6 +10,46 @@ class State(Enum):
     REPAIR_PLANNING=3
     VALIDATE=4
     FINAL=5
+
+SCHEMA = {
+    "type": "object",
+    "tools_called": {
+        "type": "array",
+        "items": {
+            "type": "object",
+            "properties": {
+                "tool_name": {"type": "string"},
+                "parameters": {"type": "object"},
+                "result": {"type": "object"}
+            },
+            "required": ["tool_name", "parameters", "result"]
+        }
+    },
+    "reasoning": {
+        "type": "string",
+        "required": "reasoning"
+    },
+    "final_output": {
+        "type": "string",
+        "required": "final_output"
+    },
+
+     "transition": {
+        "type": "string",
+        "description": "Return the next state of the agent after completing the tasks. If all tasks are done, return 'GO_IMPACT_ANALYSIS' else do not return this property.",
+    },
+}
+
+system_prompt = (
+    "You are the Observer Agent responsible for managing city infrastructure failures.\n"
+    "Your tasks include detecting failed nodes, estimating their impact\n"
+    "REQUIRED: Use the provided tools to accomplish these tasks effectively."
+    "Your goal each time is to: Detect failed nodes, estimate impact, gather all info, and prepare\n"
+    "a report for the IMPACT_ANALYSIS_AGENT agent presenting the data retrieved \n"
+    "to be able to use this and estimate himself for what is the impact of the current state of the infrastructure.\n"
+    "OUTPUT: A JSON object with the following structure:\n"
+    f"{json.dumps(SCHEMA, indent=2)}\n"
+)
 
 ALLOWED_ACTION_TYPES = {
     "tool",
@@ -50,19 +90,26 @@ ALLOWED_ACTIONS_BY_STATE = {
 }
 
 class Agent:
-    def __init__(self, model: smolagents.Model):
-        self.model = model
+    def __init__(self, agent):
+        self.agent = agent
         self.state = State.INIT
         self.memory = []
+        self.history_size=10
         pass
 
-    def update_history():
-        pass
+    def get_context(self):
+        return self.memory
+
+    def update_history(self, role, content):
+        self.memory.append({"role": role, "content": content})
+        if len(self.memory) > self.history_size:
+            removed_msg=self.memory.pop(0)
+            print(f"[Memory] Pruned old message:{removed_msg["content"][:20]}...")
 
     def run(self, maxsteps=20):
         steps = 0
 
-        while(self.state != State.FINAL and steps <= 100):
+        while(self.state != State.FINAL and steps <= 20):
             print(self.state)
             steps += 1
             system_prompt="""
@@ -79,11 +126,13 @@ class Agent:
                 OBJECTIVE: Use the available tools (detect_failure_nodes, estimate_impact) to gather info for node status and impact of failed nodes.
                 CONSTRAINT: Do not make a plan, just gather info.
                 """
-                response = self.model.generate(system_prompt)
+                response = self.model.generate(self.memory + system_prompt)
+                response = agent.run(system_prompt, 5)
 
                 # Validate response
 
                 # Add to History
+                self.update_history(self, "assistant", response)
                 self.state=State.IMPACT_ANALYSIS
                 continue
             
@@ -93,7 +142,8 @@ class Agent:
                 OBJECTIVE: Think a plan to solve the detected failures.
                 CONSTRAINT: Think step by step, do not call tools.
                 """
-                response = self.model.generate(system_prompt)
+                response = self.model.generate(self.memory + system_prompt)
+                response = agent.run(system_prompt, 5)
                 self.state = State.REPAIR_PLANNING
                 continue
             
@@ -102,7 +152,8 @@ class Agent:
                 PHASE: Repair Planning
                 OBJECTIVE: Use the available tools (assign_repair_crew) to solve the detected problems
                 """
-                response = self.model.generate(system_prompt)
+                response = self.model.generate(self.memory + system_prompt)
+                response = agent.run(system_prompt, 5)
                 self.state=State.REPAIR_PLANNING
                 continue
 
@@ -148,6 +199,7 @@ class Agent:
                     "observation": {"safe state", True}
                 }
             else:
+
                 return {
                     "ok": True, 
                     "transition": action,

@@ -3,9 +3,6 @@ from llm import llm_call
 from world import WORLD_STATE
 from enviroment_tools import OBSERVER_TOOL_REGISTRY
 
-
-
-
 SCHEMA = {
     "type": "object",
     "tools_called": {
@@ -28,15 +25,14 @@ SCHEMA = {
         "type": "string",
         "required": "final_output"
     },
-
-     "transition": {
+    "transition": {
         "type": "string",
         "description": "Return the next state of the agent after completing the tasks. If all tasks are done, return 'GO_IMPACT_ANALYSIS' else do not return this property.",
     },
 }
 
 #Observer(Analyst) 
-system_prompt = (
+observer_system_prompt = (
     "You are the Observer Agent responsible for managing city infrastructure failures.\n"
     "Your tasks include detecting failed nodes, estimating their impact\n"
     "REQUIRED: Use the provided tools to accomplish these tasks effectively."
@@ -48,7 +44,7 @@ system_prompt = (
 )
 
 #Planner(Impact Analyst)
-system_prompt = (
+planner_system_prompt = (
     "You are the IMPACT_ANALYSIS_AGENT responsible for analyzing infrastructure failures and planning optimal repair strategies.\n"
     "You do NOT detect failures yourself. You receive structured failure and impact data from the Observer Agent.\n\n"
 
@@ -62,12 +58,11 @@ system_prompt = (
     "- Do NOT call assign_repair_crew.\n"
     "- Do NOT invent new failure nodes.\n"
     "- Reason explicitly about trade-offs (e.g., high population vs critical infrastructure).\n\n"
-
     f"{json.dumps(SCHEMA, indent=2)}\n"
 )
 
 #Execution(Repair Coordination Agent)
-system_prompt = (
+repair_system_prompt = (
     "You are the EXECUTION_AGENT responsible for coordinating repair crews and executing the approved repair plan.\n\n"
 
     "Your responsibilities:\n"
@@ -82,7 +77,6 @@ system_prompt = (
     "- If execution fails, report clearly which assignments failed and why.\n\n"
     f"{json.dumps(SCHEMA, indent=2)}\n"
 )
-
 
 prompt = (
     "Detect failed nodes, estimate impact, and make a report for the planner agent to be able to use this and plan for infrastructure fixes.\n"
