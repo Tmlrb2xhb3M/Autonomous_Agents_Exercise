@@ -2,8 +2,11 @@ from enum import Enum
 from enviroment_tools import TOOL_REGISTRY
 from smolagents import  InferenceClientModel
 import json
+<<<<<<< Updated upstream
 import prompts
 from world import WORLD_STATE
+=======
+>>>>>>> Stashed changes
 
 class State(Enum):
     INIT=0
@@ -94,17 +97,24 @@ ALLOWED_ACTIONS_BY_STATE = {
 class Agent:
     def __init__(self, agent):
         self.agent = agent
+<<<<<<< Updated upstream
     def __init__(self, agent):
         self.agent = agent
         self.state = State.INIT
         self.memory = []
         self.history_size=10
         self.history_size=10
+=======
+        self.state = State.INIT
+        self.memory = []
+        self.history_size=10
+>>>>>>> Stashed changes
         pass
 
     def get_context(self):
         return self.memory
 
+<<<<<<< Updated upstream
     def get_context(self):
         return self.memory
 
@@ -113,6 +123,8 @@ class Agent:
         if len(self.memory) > self.history_size:
             removed_msg=self.memory.pop(0)
             print(f"[Memory] Pruned old message:{removed_msg["content"][:20]}...")
+=======
+>>>>>>> Stashed changes
     def update_history(self, role, content):
         self.memory.append({"role": role, "content": content})
         if len(self.memory) > self.history_size:
@@ -123,7 +135,10 @@ class Agent:
         steps = 0
 
         while(self.state != State.FINAL and steps <= 20):
+<<<<<<< Updated upstream
         while(self.state != State.FINAL and steps <= 20):
+=======
+>>>>>>> Stashed changes
             print(self.state)
             steps += 1
             system_prompt="""
@@ -135,10 +150,19 @@ class Agent:
                 continue
 
             elif self.state == State.FAILURE_DETECTION:
+<<<<<<< Updated upstream
                 system_prompt=prompts.observer_system_prompt
                 #response = self.model.generate(self.memory + system_prompt)
                 
                 #Request response from agent
+=======
+                system_prompt+="""
+                PHASE: Failure Detection.
+                OBJECTIVE: Use the available tools (detect_failure_nodes, estimate_impact) to gather info for node status and impact of failed nodes.
+                CONSTRAINT: Do not make a plan, just gather info.
+                """
+                response = self.model.generate(self.memory + system_prompt)
+>>>>>>> Stashed changes
                 response = agent.run(system_prompt, 5)
 
                 # Validate response
@@ -149,6 +173,7 @@ class Agent:
                 continue
             
             elif self.state == State.IMPACT_ANALYSIS:
+<<<<<<< Updated upstream
                 system_prompt=prompts.planner_system_prompt
                 #response = self.model.generate(self.memory + system_prompt)
 
@@ -157,10 +182,20 @@ class Agent:
 
                 # Add to History
                 self.update_history(self, "assistant", response)
+=======
+                system_prompt+="""
+                PHASE: Impact Analysis.
+                OBJECTIVE: Think a plan to solve the detected failures.
+                CONSTRAINT: Think step by step, do not call tools.
+                """
+                response = self.model.generate(self.memory + system_prompt)
+                response = agent.run(system_prompt, 5)
+>>>>>>> Stashed changes
                 self.state = State.REPAIR_PLANNING
                 continue
             
             elif self.state == State.REPAIR_PLANNING:
+<<<<<<< Updated upstream
                 system_prompt=prompts.repair_system_prompt
                 #response = self.model.generate(self.memory + system_prompt)
 
@@ -169,6 +204,14 @@ class Agent:
 
                 # Add to History
                 self.update_history(self, "assistant", response)
+=======
+                system_prompt+="""
+                PHASE: Repair Planning
+                OBJECTIVE: Use the available tools (assign_repair_crew) to solve the detected problems
+                """
+                response = self.model.generate(self.memory + system_prompt)
+                response = agent.run(system_prompt, 5)
+>>>>>>> Stashed changes
                 self.state=State.REPAIR_PLANNING
                 continue
 
@@ -225,7 +268,10 @@ class Agent:
                 }
             else:
 
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
                 return {
                     "ok": True, 
                     "transition": action,
