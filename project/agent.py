@@ -2,6 +2,7 @@ from enum import Enum
 from enviroment_tools import TOOL_REGISTRY
 from smolagents import  InferenceClientModel
 import json
+import prompts
 
 class State(Enum):
     INIT=0
@@ -39,17 +40,6 @@ SCHEMA = {
         "description": "Return the next state of the agent after completing the tasks. If all tasks are done, return 'GO_IMPACT_ANALYSIS' else do not return this property.",
     },
 }
-
-system_prompt = (
-    "You are the Observer Agent responsible for managing city infrastructure failures.\n"
-    "Your tasks include detecting failed nodes, estimating their impact\n"
-    "REQUIRED: Use the provided tools to accomplish these tasks effectively."
-    "Your goal each time is to: Detect failed nodes, estimate impact, gather all info, and prepare\n"
-    "a report for the IMPACT_ANALYSIS_AGENT agent presenting the data retrieved \n"
-    "to be able to use this and estimate himself for what is the impact of the current state of the infrastructure.\n"
-    "OUTPUT: A JSON object with the following structure:\n"
-    f"{json.dumps(SCHEMA, indent=2)}\n"
-)
 
 ALLOWED_ACTION_TYPES = {
     "tool",
@@ -121,12 +111,10 @@ class Agent:
                 continue
 
             elif self.state == State.FAILURE_DETECTION:
-                system_prompt+="""
-                PHASE: Failure Detection.
-                OBJECTIVE: Use the available tools (detect_failure_nodes, estimate_impact) to gather info for node status and impact of failed nodes.
-                CONSTRAINT: Do not make a plan, just gather info.
-                """
-                response = self.model.generate(self.memory + system_prompt)
+                system_prompt=prompts.observer_system_prompt
+                #response = self.model.generate(self.memory + system_prompt)
+                
+                #Request response from agent
                 response = agent.run(system_prompt, 5)
 
                 # Validate response
@@ -137,23 +125,26 @@ class Agent:
                 continue
             
             elif self.state == State.IMPACT_ANALYSIS:
-                system_prompt+="""
-                PHASE: Impact Analysis.
-                OBJECTIVE: Think a plan to solve the detected failures.
-                CONSTRAINT: Think step by step, do not call tools.
-                """
-                response = self.model.generate(self.memory + system_prompt)
+                system_prompt=prompts.planner_system_prompt
+                #response = self.model.generate(self.memory + system_prompt)
+
+                #Request response from agent
                 response = agent.run(system_prompt, 5)
+
+                # Add to History
+                self.update_history(self, "assistant", response)
                 self.state = State.REPAIR_PLANNING
                 continue
             
             elif self.state == State.REPAIR_PLANNING:
-                system_prompt+="""
-                PHASE: Repair Planning
-                OBJECTIVE: Use the available tools (assign_repair_crew) to solve the detected problems
-                """
-                response = self.model.generate(self.memory + system_prompt)
+                system_prompt=prompts.repair_system_prompt
+                #response = self.model.generate(self.memory + system_prompt)
+
+                #Request response from agent
                 response = agent.run(system_prompt, 5)
+
+                # Add to History
+                self.update_history(self, "assistant", response)
                 self.state=State.REPAIR_PLANNING
                 continue
 

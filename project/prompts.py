@@ -82,29 +82,29 @@ prompt = (
     "Detect failed nodes, estimate impact, and make a report for the planner agent to be able to use this and plan for infrastructure fixes.\n"
 )
 
-#failure management
-system_prompt=("""
-                You are an infrastructures failure management agent.
-                You must respond with a valid JSON object.
-                """
-)
+# #failure management
+# system_prompt=("""
+#                 You are an infrastructures failure management agent.
+#                 You must respond with a valid JSON object.
+#                 """
+# )
 
-#Failure Detection
-system_prompt+="""
-                PHASE: Failure Detection.
-                OBJECTIVE: Use the available tools (detect_failure_nodes, estimate_impact) to gather info for node status and impact of failed nodes.
-                CONSTRAINT: Do not make a plan, just gather info.
-                """
+# #Failure Detection
+# system_prompt+="""
+#                 PHASE: Failure Detection.
+#                 OBJECTIVE: Use the available tools (detect_failure_nodes, estimate_impact) to gather info for node status and impact of failed nodes.
+#                 CONSTRAINT: Do not make a plan, just gather info.
+#                 """
 
-#Impact analysist
-system_prompt+="""
-                PHASE: Impact Analysis.
-                OBJECTIVE: Think a plan to solve the detected failures.
-                CONSTRAINT: Think step by step, do not call tools.
-                """
+# #Impact analysist
+# system_prompt+="""
+#                 PHASE: Impact Analysis.
+#                 OBJECTIVE: Think a plan to solve the detected failures.
+#                 CONSTRAINT: Think step by step, do not call tools.
+#                 """
 
-#Repair Planning
-system_prompt+="""
-                PHASE: Repair Planning
-                OBJECTIVE: Use the available tools (assign_repair_crew) to solve the detected problems
-                """
+# #Repair Planning
+# system_prompt+="""
+#                 PHASE: Repair Planning
+#                 OBJECTIVE: Use the available tools (assign_repair_crew) to solve the detected problems
+#                 """
