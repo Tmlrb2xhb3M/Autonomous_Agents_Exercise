@@ -28,8 +28,7 @@ SCHEMA = {
         "type": "string",
         "required": "final_output"
     },
-
-     "transition": {
+    "transition": {
         "type": "string",
         "description": "Return the next state of the agent after completing the tasks. If all tasks are done, return 'GO_IMPACT_ANALYSIS' else do not return this property.",
     },

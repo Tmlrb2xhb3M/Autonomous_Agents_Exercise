@@ -1,9 +1,19 @@
 from enum import Enum
-from enviroment_tools import TOOL_REGISTRY
+import re
+import time
+from wsgiref import validate
+
+from pydantic import ValidationError
+from enviroment_tools import detect_failure_nodes, estimate_impact, assign_repair_crew
 from smolagents import  InferenceClientModel, tool
 import json
 import prompts
 from world import WORLD_STATE
+import os
+import json
+from smolagents import ToolCallingAgent, OpenAIServerModel
+from smolagents.monitoring import LogLevel
+from enviroment_tools import TOOL_REGISTRY
 
 class State(Enum):
     INIT=0
@@ -53,6 +63,16 @@ system_prompt = (
     f"{json.dumps(SCHEMA, indent=2)}\n"
 )
 
+SCHEMA={}
+
+TRANSITION_REGISTRY = {
+    ("GO_FAILURE_DETECTION", State.FAILURE_DETECTION),
+    ("GO_IMPACT_ANALYSIS", State.IMPACT_ANALYSIS),
+    ("GO_REPAIR_PLANNING", State.REPAIR_PLANNING),
+    ("GO_VALIDATE", State.VALIDATE),
+    ("GO_FINAL", State.FINAL)
+}
+
 ALLOWED_ACTION_TYPES = {
     "tool",
     "transition",
@@ -72,12 +92,15 @@ ALLOWED_ACTIONS_BY_STATE = {
         ("transition", "GO_FAILURE_DETECTION")
     },
     State.FAILURE_DETECTION: {
+        ("tool", "detect_failure_nodes"),
+        ("tool", "estimate_impact"),
         ("transition", "GO_IMPACT_ANALYSIS"),
     },
     State.IMPACT_ANALYSIS: {
         ("transition", "GO_REPAIR_PLANNING")
     },
     State.REPAIR_PLANNING: {
+        ("tool", "assign_repair_crew"),
         ("transition", "GO_IMPACT_ANALYSIS"),
         ("transition", "GO_VALIDATE"),
     },
@@ -91,9 +114,16 @@ ALLOWED_ACTIONS_BY_STATE = {
     }
 }
 
+class LLMConnect:
+    def __init__(self, model, tools):
+        agent = ToolCallingAgent(
+        model=model,
+        tools=tools,
+        return_full_result=True,
+        verbosity_level=LogLevel.ERROR
+    )
+
 class Agent:
-    def __init__(self, agent):
-        self.agent = agent
     def __init__(self, agent):
         self.agent = agent
         self.state = State.INIT
@@ -119,7 +149,7 @@ class Agent:
             removed_msg=self.memory.pop(0)
             print(f"[Memory] Pruned old message:{removed_msg["content"][:20]}...")
 
-    def run(self, maxsteps=20):
+    def run(self, maxsteps=10):
         steps = 0
 
         while(self.state != State.FINAL and steps <= 20):
@@ -141,7 +171,7 @@ class Agent:
                 response = agent.run(system_prompt, 5)
 
                 # Validate response
-
+                
                 # Add to History
                 self.update_history(self, "assistant", response)
                 self.state=State.IMPACT_ANALYSIS
@@ -194,58 +224,119 @@ class Agent:
             
         return violations
 
-    def route_decision(self, decision):
-        action_type=decision.get("action_type")
-        action=decision.get("action")
+def route_decision(current_state: State, decision: dict[str, any]) -> dict[str, any]:
+    action_type=decision.get("action_type")
+    action=decision.get("action")
+    args=decision.get("arguements", {}) or {}
 
-        if action_type not in ALLOWED_ACTION_TYPES:
-            return {
-                "ok":False, 
-                "action_type": action_type,
-                "error": f"Action type {action_type} not on allowed action types.",
-                "observation": {"safe state": True}
-            }
+    if action_type not in ALLOWED_ACTION_TYPES:
+        return {
+            "ok":False, 
+            "action_type": action_type,
+            "error": f"Action type {action_type} not on allowed action types.",
+            "observation": {"safe state": True}
+        }
 
-        if (action_type, action) not in ALLOWED_ACTIONS_BY_STATE:
+    if (action_type, action) not in ALLOWED_ACTIONS_BY_STATE:
+        return {
+            "ok": False,
+            action_type: action,
+            "error": f"Action '{action}' not allowed in state '{current_state}'.",
+            "observation": {"safe state", True}
+        }
+    
+    if action_type == "transition":
+        if action not in ALLOWED_TRANSITIONS:
             return {
                 "ok": False,
-                action_type: action,
-                "error": f"Action '{action}' not allowed in state '{self.state}'.",
+                "transition": action,
+                "error": f"Transition '{action}' not allowed in system.",
                 "observation": {"safe state", True}
             }
-        
-        if action_type == "transition":
-            if action not in ALLOWED_TRANSITIONS:
-                return {
-                    "ok": False,
-                    "transition": action,
-                    "error": f"Transition '{action}' not allowed in system.",
-                    "observation": {"safe state", True}
-                }
-            else:
-                return {
-                    "ok": True, 
-                    "transition": action,
-                    "error": "No error",
-                    "observation": {"transition": action}
-                }
-        
-        if action_type == "tool":
-            if action not in TOOL_REGISTRY:
-                return {
-                    "ok": False,
-                    "tool": action,
-                    "error": f"Action {action} not in tool registry.",
-                    "observation": {"safe state": True}
-                }
+        state=TRANSITION_REGISTRY[]
+        return {
+            "ok": True, 
+            "transition": action,
+            "error": "No error",
+            "observation": {"transition": action}
+        }
+    
+    if action_type == "tool":
+        if action not in TOOL_REGISTRY:
+            return {
+                "ok": False,
+                "tool": action,
+                "error": f"Action {action} not in tool registry.",
+                "observation": {"safe state": True}
+            }
+        try:
+            result=TOOL_REGISTRY[action](**args)
+            return {
+                "ok": False,
+                "tool": action,
+                "observation": result
+            }
+        except Exception as e:
+            return{
+                "ok": False,
+                "tool": action,
+                "error": f"Tool error: {repr(e)}",
+                "observation": {"tool_failed": True}
+            }
 
-        if action_type == "final":
+    if action_type == "final":
+        return {
+            "ok": True,
+            "final": True,
+            "error": "No error",
+            "observation": "None"
+        }
+
+def llm_raw(task: str):
+        # messages=[]
+        
+        # response = self.model.generate(messages)
+        # time.sleep(10.0)
+        # return response
+       pass
+
+def call_controller(task: str, max_retries):
+    last_error=None
+    for attempt in range(1, max_retries+2):
+        raw=llm_raw(task)
+        try:
+            # decision=parse_and_validate()
+            decision=None
             return {
                 "ok": True,
-                "final": True,
-                "error": "No error",
-                "observation": "None"
+                "raw": raw,
+                "decision": decision,
+                "error": None
             }
-        
+        except(ValueError, json.JSONDecodeError, ValidationError) as e:
+            last_error=repr(e)
+            extra=(
+                "The previous output was invalid.\n"
+                f"Error: {last_error}\n"
+                "Return only valid JSON that passes the schema. Nothing else."
+            )
+            pass
+    pass
+
+def extract_json_object(raw: str) -> str:
+    raw=raw.strip()
+    if raw.startswith("{") and raw.endswith("}"):
+        return raw
+    m=re.search(r"\{.*\}", raw, re.DOTALL)
+    if not m:
+        raise ValueError("No JSON object found in model output.")
+    return m.group(0)
+
+def parse_and_validate(raw: str) -> dict[str, any]:
+    txt=extract_json_object(raw)
+    obj=json.loads(txt)
+    validate(obj, SCHEMA)
+    return obj
+
 agent = Agent(model=InferenceClientModel())
 agent.run()

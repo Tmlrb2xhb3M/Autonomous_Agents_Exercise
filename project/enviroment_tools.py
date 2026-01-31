@@ -143,3 +143,9 @@ OBSERVER_TOOL_REGISTRY = {
 PLANNER_TOOL_REGISTRY = {
     "assign_repair_crew": assign_repair_crew
 }
+
+TOOL_REGISTRY = {
+    "detect_failure_nodes": detect_failure_nodes,
+    "estimate_impact": estimate_impact,
+    "assign_repair_crew": assign_repair_crew
+}
