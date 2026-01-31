@@ -3,6 +3,8 @@ import json
 from smolagents import ToolCallingAgent, OpenAIServerModel
 from smolagents.monitoring import LogLevel
 
+
+
 model = OpenAIServerModel(
     model_id="Qwen/Qwen2.5-Coder-32B-Instruct",
     api_base="https://router.huggingface.co/v1",
@@ -11,7 +13,8 @@ model = OpenAIServerModel(
     temperature=0.2,
 )
 
-def llm_call(system_prompt: str, prompt: str, tools=[], messages=None, sliding_window = None, max_steps: int = 10) -> ToolCallingAgent.Result:
+def llm_call(system_prompt: str, prompt: str, tools=[], messages=None, sliding_window = None, max_steps: int = 10):
+#->ToolCallingAgent.Result:
     agent = ToolCallingAgent(
         model=model,
         tools=tools,
@@ -27,6 +30,7 @@ def llm_call(system_prompt: str, prompt: str, tools=[], messages=None, sliding_w
     if sliding_window is not None:
         history = messages[-sliding_window:]
 
+#
     history_text = system_prompt + "\n\n"
     for m in history:
         role = m.get("role", "user").upper()
