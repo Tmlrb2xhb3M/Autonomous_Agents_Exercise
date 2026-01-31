@@ -42,6 +42,17 @@ SCHEMA = {
     },
 }
 
+system_prompt = (
+    "You are the Observer Agent responsible for managing city infrastructure failures.\n"
+    "Your tasks include detecting failed nodes, estimating their impact\n"
+    "REQUIRED: Use the provided tools to accomplish these tasks effectively."
+    "Your goal each time is to: Detect failed nodes, estimate impact, gather all info, and prepare\n"
+    "a report for the IMPACT_ANALYSIS_AGENT agent presenting the data retrieved \n"
+    "to be able to use this and estimate himself for what is the impact of the current state of the infrastructure.\n"
+    "OUTPUT: A JSON object with the following structure:\n"
+    f"{json.dumps(SCHEMA, indent=2)}\n"
+)
+
 ALLOWED_ACTION_TYPES = {
     "tool",
     "transition",
@@ -83,10 +94,16 @@ ALLOWED_ACTIONS_BY_STATE = {
 class Agent:
     def __init__(self, agent):
         self.agent = agent
+    def __init__(self, agent):
+        self.agent = agent
         self.state = State.INIT
         self.memory = []
         self.history_size=10
+        self.history_size=10
         pass
+
+    def get_context(self):
+        return self.memory
 
     def get_context(self):
         return self.memory
@@ -96,10 +113,16 @@ class Agent:
         if len(self.memory) > self.history_size:
             removed_msg=self.memory.pop(0)
             print(f"[Memory] Pruned old message:{removed_msg["content"][:20]}...")
+    def update_history(self, role, content):
+        self.memory.append({"role": role, "content": content})
+        if len(self.memory) > self.history_size:
+            removed_msg=self.memory.pop(0)
+            print(f"[Memory] Pruned old message:{removed_msg["content"][:20]}...")
 
     def run(self, maxsteps=20):
         steps = 0
 
+        while(self.state != State.FINAL and steps <= 20):
         while(self.state != State.FINAL and steps <= 20):
             print(self.state)
             steps += 1
@@ -201,6 +224,7 @@ class Agent:
                     "observation": {"safe state", True}
                 }
             else:
+
 
                 return {
                     "ok": True, 
