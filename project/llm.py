@@ -1,136 +1,74 @@
 import os
 import json
 from typing import List, Dict, Any, Optional
-from smolagents import OpenAIServerModel
+from smolagents import InferenceClientModel
 from jsonschema import validate
 
 class LLMConnector:
     def __init__(self, model_id: str, system_prompt: str, tools = None, messages = None, sliding_window = None, max_steps: int = 5, response_schema: Optional[Dict[str, Any]] = None):
         self.model_id = model_id
         self.base_system_prompt = system_prompt
+        self.response_schema = response_schema
         self.tools = tools
         self.messages = messages
+        self.initial_messages = messages.copy() if messages else []
+        self.initial_message_count = len(self.initial_messages)
         self.sliding_window = sliding_window
         self.max_steps = max_steps
-        self.tool_choice = "auto" if self.tools else None
         
-        # Build enhanced system prompt with schema instructions
-        self.system_prompt = self.base_system_prompt
-        if response_schema is not None:
-            self.system_prompt = self._build_instructions(self.system_prompt, response_schema)
-
-        # Model Ids: 
-        # - "Qwen/Qwen2.5-Coder-32B-Instruct"
-        self.model = OpenAIServerModel(
+        self.system_prompt = self._build_instructions()
+        
+        self.model = InferenceClientModel(
             model_id=self.model_id,
-            api_base="https://router.huggingface.co/v1",
-            api_key=os.environ["HF_TOKEN"],
-            temperature=0.2,
+            token=os.environ.get("HF_TOKEN"),
+            timeout=120,
         )
         
     def run(self, prompt: str):
         history = self.messages if self.messages is not None else []
         
-        if self.sliding_window is not None and self.messages is not None:
-            history = self.messages[-self.sliding_window:]
-
-        # Build conversation with system prompt and history
+        if self.sliding_window is not None and len(history) > self.initial_message_count:
+            additional_messages = history[self.initial_message_count:]
+            if len(additional_messages) > self.sliding_window:
+                additional_messages = additional_messages[-self.sliding_window:]
+            history = self.initial_messages + additional_messages
+        
         conversation = []
         
-        conversation.append({"role": "system", "content": self.system_prompt})
+        conversation.append({
+            "role": "system", 
+            "content": [{"type": "text", "text": self.system_prompt}]
+        })
         
         for m in history:
             conversation.append(m)
         
-        # User prompt
-        conversation.append({"role": "user", "content": prompt})
-        
-        # Prepare tools metadata
-        tools_metadata = self._prepare_tools_metadata()
-        
-        return self.model(
-            conversation, 
-            tools=tools_metadata, 
-            tool_choice=self.tool_choice
-        )
-    
+        conversation.append({
+            "role": "user", 
+            "content": [{"type": "text", "text": prompt}]
+        })  
 
-    # Private Method: Helpers
-    def _build_instructions(self, base_prompt: str, schema: Dict[str, Any]) -> str:
-        instructions = ''
-        instructions += base_prompt + "\n\n"
-        if schema:
-            instructions += "RESPONSE FORMAT (MANDATORY):\n"
-            instructions += "You must respond ONLY with a single valid JSON object.\n"
-            instructions += "Do NOT include explanations, markdown, comments, or conversational text.\n"
-            instructions += "The JSON MUST strictly follow the schema below and in your response to have no json schema definitions.\n\n"
-            instructions += f"{json.dumps(schema, indent=2)}\n"
+        if self.tools and len(self.tools) > 0:
+            return self.model(
+                conversation, 
+                tools_to_call_from=self.tools,
+                tool_choice="auto"
+            )
+        else:
+            return self.model(conversation)
+    
+    def _build_instructions(self) -> str:
+        instructions = self.base_system_prompt
+        
+        if self.response_schema:
+            instructions += "\n\nRESPONSE FORMAT:\nRespond with valid JSON matching this schema:\n"
+            instructions += json.dumps(self.response_schema, indent=2)
+            instructions += "\n\nIMPORTANT:\n- Follow the schema strictly"
+            instructions += "\n- Include all required fields"
+            instructions += "\n- Use correct data types"
+            instructions += "\n- Respond with ONLY the JSON object"
         
         return instructions
-    
-
-    def _prepare_tools_metadata(self) -> Optional[List[Dict[str, Any]]]:
-        """Convert SimpleTool objects to OpenAI function calling format."""
-        if not self.tools:
-            return None
-        
-        tools_metadata = []
-        for tool in self.tools:
-            tool_schema = {
-                "type": "function",
-                "function": {
-                    "name": tool.name,
-                    "description": tool.description,
-                }
-            }
-            
-            # Add parameters if the tool has inputs defined
-            if hasattr(tool, 'inputs') and tool.inputs:
-                properties = {}
-                required = []
-                
-                for param_name, param_info in tool.inputs.items():
-                    param_type = param_info.get('type', 'string')
-                    param_desc = param_info.get('description', '')
-                    
-                    # Map Python types to JSON schema types
-                    json_type = 'string'
-                    if param_type in ['int', 'integer']:
-                        json_type = 'integer'
-                    elif param_type in ['float', 'number']:
-                        json_type = 'number'
-                    elif param_type in ['bool', 'boolean']:
-                        json_type = 'boolean'
-                    elif param_type in ['list', 'array']:
-                        json_type = 'array'
-                    elif param_type in ['dict', 'object']:
-                        json_type = 'object'
-                    
-                    properties[param_name] = {
-                        "type": json_type,
-                        "description": param_desc
-                    }
-                    
-                    # Check if parameter is required
-                    if param_info.get('required', False):
-                        required.append(param_name)
-                
-                tool_schema["function"]["parameters"] = {
-                    "type": "object",
-                    "properties": properties,
-                    "required": required
-                }
-            else:
-                # No parameters
-                tool_schema["function"]["parameters"] = {
-                    "type": "object",
-                    "properties": {},
-                    "required": []
-                }
-            
-            tools_metadata.append(tool_schema)
-        
-        return tools_metadata
 
     # Parse Response Methods
     @staticmethod
@@ -141,44 +79,91 @@ class LLMConnector:
     
     @staticmethod
     def get_tool_calls(response) -> Optional[List[Dict[str, Any]]]:
-        # First check for native OpenAI tool calls
         if hasattr(response, 'tool_calls') and response.tool_calls:
             return response.tool_calls
         
-        # Fallback: Parse tool calls from text content for models that don't support native tool_calls
         if hasattr(response, 'content') and response.content:
             try:
                 content = response.content.strip()
-                parsed = json.loads(content)
                 
-                # Check if content has function_name/function_args format (common fallback)
-                if 'function_name' in parsed and 'function_args' in parsed:
-                    return [{
-                        'id': 'call_fallback_0',
-                        'type': 'function',
-                        'function': {
-                            'name': parsed['function_name'],
-                            'arguments': json.dumps(parsed['function_args'])
-                        }
-                    }]
+                try:
+                    parsed = json.loads(content)
+                    
+                    if 'name' in parsed and 'arguments' in parsed:
+                        return [{
+                            'id': 'call_fallback_0',
+                            'type': 'function',
+                            'function': {
+                                'name': parsed['name'],
+                                'arguments': json.dumps(parsed['arguments']) if isinstance(parsed['arguments'], dict) else parsed['arguments']
+                            }
+                        }]
+                    
+                    if 'function_name' in parsed and 'function_args' in parsed:
+                        return [{
+                            'id': 'call_fallback_0',
+                            'type': 'function',
+                            'function': {
+                                'name': parsed['function_name'],
+                                'arguments': json.dumps(parsed['function_args'])
+                            }
+                        }]
+                    
+                    if 'tool_calls' in parsed and isinstance(parsed['tool_calls'], list):
+                        tool_calls = []
+                        for idx, tc in enumerate(parsed['tool_calls']):
+                            if 'tool_name' in tc:
+                                tool_calls.append({
+                                    'id': f'call_fallback_{idx}',
+                                    'type': 'function',
+                                    'function': {
+                                        'name': tc['tool_name'],
+                                        'arguments': json.dumps(tc.get('parameters', {}))
+                                    }
+                                })
+                        if tool_calls:
+                            return tool_calls
                 
-                # Check if content has tool_calls array format
-                if 'tool_calls' in parsed and isinstance(parsed['tool_calls'], list):
+                except json.JSONDecodeError:
+                    lines = content.strip().split('\n')
                     tool_calls = []
-                    for idx, tc in enumerate(parsed['tool_calls']):
-                        if 'tool_name' in tc:
-                            tool_calls.append({
-                                'id': f'call_fallback_{idx}',
-                                'type': 'function',
-                                'function': {
-                                    'name': tc['tool_name'],
-                                    'arguments': json.dumps(tc.get('parameters', {}))
-                                }
-                            })
+                    
+                    for idx, line in enumerate(lines):
+                        line = line.strip()
+                        if not line:
+                            continue
+                        
+                        try:
+                            parsed = json.loads(line)
+                            
+                            # Check for name/arguments format
+                            if 'name' in parsed and 'arguments' in parsed:
+                                tool_calls.append({
+                                    'id': f'call_fallback_{idx}',
+                                    'type': 'function',
+                                    'function': {
+                                        'name': parsed['name'],
+                                        'arguments': json.dumps(parsed['arguments']) if isinstance(parsed['arguments'], dict) else parsed['arguments']
+                                    }
+                                })
+                            # Check for function_name/function_args format
+                            elif 'function_name' in parsed and 'function_args' in parsed:
+                                tool_calls.append({
+                                    'id': f'call_fallback_{idx}',
+                                    'type': 'function',
+                                    'function': {
+                                        'name': parsed['function_name'],
+                                        'arguments': json.dumps(parsed['function_args'])
+                                    }
+                                })
+                        except json.JSONDecodeError:
+                            continue
+                    
                     if tool_calls:
                         return tool_calls
                         
-            except (json.JSONDecodeError, KeyError):
+            except (KeyError, Exception):
+                pass
                 pass
         
         return None
@@ -189,9 +174,6 @@ class LLMConnector:
         parsed = json.loads(content)
         
         if schema is not None:
-            try:
-                validate(instance=parsed, schema=schema)
-            except ImportError:
-                print("Warning: jsonschema not installed, skipping validation")
+            validate(instance=parsed, schema=schema)
         
         return parsed

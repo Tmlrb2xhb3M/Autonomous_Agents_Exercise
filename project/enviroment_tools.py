@@ -2,6 +2,20 @@ from typing import Dict, List, Any
 from smolagents import tool
 from world import WORLD_STATE
 
+# Tool Execution Helper 
+def execute_tool(tool_name: str, tool_args: dict):
+    """Execute a tool by name with given arguments."""
+    tool = ALL_TOOLS.get(tool_name)
+    if tool is None:
+        return {"error": f"Tool '{tool_name}' not found"}
+    
+    try:
+        result = tool(**tool_args)
+        return result
+    except Exception as e:
+        return {"error": f"Tool execution failed: {str(e)}"}
+
+# Tool Implementations
 @tool
 def detect_failure_nodes() -> List[str]:
     """
@@ -41,6 +55,34 @@ def estimate_impact(node_id: str) -> Dict[str, object]:
         "population_affected": node["population_affected"],
         "criticality": node["criticality"]
     }
+
+@tool
+def get_available_crews() -> Dict[str, Any]:
+    """
+    Returns information about available repair crews (only crews with availability=True).
+    
+    Returns:
+        dict: A dictionary where keys are crew IDs and values contain crew details:
+            {
+                "Crew_A": {
+                    "skills": ["water"],
+                    "availability": True,
+                    "current_node": None
+                },
+                ...
+            }
+            Only includes crews that are currently available.
+    """
+    global WORLD_STATE
+    crews_info = {}
+    for crew_id, crew in WORLD_STATE["crews"].items():
+        if crew["availability"]:
+            crews_info[crew_id] = {
+                "skills": crew["skills"],
+                "availability": crew["availability"],
+                "current_node": crew["current_node"]
+            }
+    return crews_info
 
 @tool
 def assign_repair_crew(node_ids: List[str], crew_ids: List[str]) -> Dict[str,Any]:
@@ -118,7 +160,6 @@ def assign_repair_crew(node_ids: List[str], crew_ids: List[str]) -> Dict[str,Any
     }
 
 def step_simulation_time():
-
     global WORLD_STATE
     WORLD_STATE["simulation_time"] += 1
     for node_id, node in WORLD_STATE["nodes"].items():
@@ -132,14 +173,21 @@ def step_simulation_time():
                     crew_id = c_id
                     break
             node["status"] = "repaired"
-            print(f"[{WORLD_STATE['simulation_time']}] Repair complete: {node_id} by {crew_id}")
 
-# Tool Registries
-OBSERVER_TOOL_REGISTRY = {
+
+# Tool Configurations
+ALL_TOOLS = {
     "detect_failure_nodes": detect_failure_nodes,
     "estimate_impact": estimate_impact,
+    "assign_repair_crew": assign_repair_crew,
+    "get_available_crews": get_available_crews
 }
 
-PLANNER_TOOL_REGISTRY = {
-    "assign_repair_crew": assign_repair_crew
-}
+# Tool Registries
+FAILURE_DETECTION_TOOLS = [detect_failure_nodes]
+
+IMPACT_ANALYSIS_TOOLS = [estimate_impact]
+
+PLANNER_TOOL_REGISTRY = [get_available_crews]
+
+REPAIR_EXECUTOR_TOOLS = [assign_repair_crew, get_available_crews]
