@@ -3,7 +3,7 @@ from typing import Dict, Any, Optional
 import json
 import configs
 from llm import LLMConnector
-from enviroment_tools import execute_tool
+from enviroment_tools import execute_tool, check_all_nodes_status
 from jsonschema import validate, ValidationError
 from world import WORLD_STATE
 
@@ -36,6 +36,11 @@ class InfrastructureRepairAgent:
 
         while self.state != State.FINAL and steps < maxsteps:
             steps += 1
+            # Check if all nodes are repaired
+            status = check_all_nodes_status()
+            if status["all_repaired"]:
+                self.state = State.FINAL
+                break
             
             if self.state == State.INIT:
                 self.state = State.FAILURE_DETECTION
@@ -77,6 +82,21 @@ class InfrastructureRepairAgent:
                 
                 self.update_history("assistant", json.dumps(response_data))
                 
+                # Check if no failed nodes detected (all in repair or repaired)
+                if not response_data.get('priority_list') or len(response_data.get('priority_list', [])) == 0:
+                    # No failures detected - check status
+                    status = check_all_nodes_status()
+                    if status["nodes_in_repair"]:
+                        # Nodes are being repaired - advance simulation time
+                        from enviroment_tools import step_simulation_time
+                        step_simulation_time()
+                        print(f"\n=== No failures detected. Advancing simulation time to {WORLD_STATE['simulation_time']}. Nodes in repair: {status['nodes_in_repair']} ===")
+                        # Stay in IMPACT_ANALYSIS to check again
+                        continue
+                    else:
+                        self.state = State.FINAL
+                        continue
+                
                 # Transition
                 next_state = response_data.get('transition', State.REPAIR_PLANNING.name)
                 if next_state == State.REPAIR_PLANNING.name:
@@ -87,7 +107,6 @@ class InfrastructureRepairAgent:
                 state_config = configs.STATES_CONFIGS[State.REPAIR_PLANNING.name]
                 prompt = state_config["prompt"]
                 
-                # Add user prompt to global history
                 self.update_history("user", prompt)
                 
                 response_data = self._run_llm(
@@ -102,7 +121,6 @@ class InfrastructureRepairAgent:
                 next_state = response_data.get('transition', State.REPAIR_VALIDATOR.name)
                 if next_state == State.REPAIR_VALIDATOR.name:
                     self.state = State.REPAIR_VALIDATOR
-                    # Store plan for validation
                     self.repair_plan_data = response_data
                 continue
 
@@ -136,14 +154,14 @@ class InfrastructureRepairAgent:
                 
                 self.update_history("assistant", json.dumps(response_data))
                 
-                self.state = State.FINAL
+                # After executing repairs, return to FAILURE_DETECTION to check status
+                self.state = State.FAILURE_DETECTION
                 continue
 
             elif self.state == State.FINAL:
                 break
         
         return {
-            "final_state": self.state.name,
             "history": self.history,
             "traces": self.traces
         }

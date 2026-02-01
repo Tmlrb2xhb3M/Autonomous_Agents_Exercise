@@ -84,6 +84,35 @@ def get_available_crews() -> Dict[str, Any]:
             }
     return crews_info
 
+def check_all_nodes_status() -> Dict[str, Any]:
+    """Check if all failed nodes have been repaired or are in repair.
+    
+    Returns:
+        dict: Contains:
+            - "all_repaired": bool - True if all nodes are operational (no failed nodes)
+            - "nodes_in_repair": list - Node IDs currently being repaired
+            - "failed_nodes": list - Node IDs still failed
+            - "simulation_time": int - Current simulation time
+    """
+    global WORLD_STATE
+    nodes_in_repair = []
+    failed_nodes = []
+    
+    for node_id, node in WORLD_STATE["nodes"].items():
+        if node["status"] == "in_repair":
+            nodes_in_repair.append(node_id)
+        elif node["status"] == "failed":
+            failed_nodes.append(node_id)
+    
+    all_repaired = len(failed_nodes) == 0 and len(nodes_in_repair) == 0
+    
+    return {
+        "all_repaired": all_repaired,
+        "nodes_in_repair": nodes_in_repair,
+        "failed_nodes": failed_nodes,
+        "simulation_time": WORLD_STATE["simulation_time"]
+    }
+
 @tool
 def assign_repair_crew(node_ids: List[str], crew_ids: List[str]) -> Dict[str,Any]:
     """
@@ -136,7 +165,8 @@ def assign_repair_crew(node_ids: List[str], crew_ids: List[str]) -> Dict[str,Any
         crew["assigned_at"] = WORLD_STATE["simulation_time"]
         node["status"] = "in_repair"
         node["repair_start_time"] = WORLD_STATE["simulation_time"]
-        node["repair_duration"] = 8  if node["criticality"] == "High" else 5
+        if node.get("repair_duration") is None:
+            node["repair_duration"] = 2 if node["criticality"] == "High" else 1
 
         assignments[crew_id] = node_id
 
@@ -180,7 +210,8 @@ ALL_TOOLS = {
     "detect_failure_nodes": detect_failure_nodes,
     "estimate_impact": estimate_impact,
     "assign_repair_crew": assign_repair_crew,
-    "get_available_crews": get_available_crews
+    "get_available_crews": get_available_crews,
+    "check_all_nodes_status": check_all_nodes_status
 }
 
 # Tool Registries

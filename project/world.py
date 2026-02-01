@@ -8,7 +8,7 @@ WORLD_STATE = {
             "criticality" : "Medium",
             "status" : "failed",
             "repair_start_time": None,
-            "repair_duration": 8
+            "repair_duration": 1
         },
         "Pipe_20":{
             "type": "water",
@@ -17,7 +17,7 @@ WORLD_STATE = {
             "criticality" : "High",
             "status" : "failed",
             "repair_start_time": None,
-            "repair_duration": 8
+            "repair_duration": 2
         },
         "Server_A":{
             "type": "network",
@@ -26,7 +26,7 @@ WORLD_STATE = {
             "criticality" : "High",
             "status" : "failed",
             "repair_start_time": None,
-            "repair_duration": 5
+            "repair_duration": 2
         },
         "Tower_3":{
             "type": "telecom",

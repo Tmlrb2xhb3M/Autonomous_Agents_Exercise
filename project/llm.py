@@ -1,8 +1,10 @@
 import os
 import json
+import time
 from typing import List, Dict, Any, Optional
 from smolagents import InferenceClientModel
 from jsonschema import validate
+from huggingface_hub.errors import HfHubHTTPError
 
 class LLMConnector:
     def __init__(self, model_id: str, system_prompt: str, tools = None, messages = None, sliding_window = None, max_steps: int = 5, response_schema: Optional[Dict[str, Any]] = None):
@@ -48,14 +50,28 @@ class LLMConnector:
             "content": [{"type": "text", "text": prompt}]
         })  
 
-        if self.tools and len(self.tools) > 0:
-            return self.model(
-                conversation, 
-                tools_to_call_from=self.tools,
-                tool_choice="auto"
-            )
-        else:
-            return self.model(conversation)
+        try:
+            if self.tools and len(self.tools) > 0:
+                return self.model(
+                    conversation, 
+                    tools_to_call_from=self.tools,
+                    tool_choice="auto"
+                )
+            else:
+                return self.model(conversation)
+        except HfHubHTTPError as e:
+            if "402" in str(e) or "Payment Required" in str(e):
+                time.sleep(3)
+                if self.tools and len(self.tools) > 0:
+                    return self.model(
+                        conversation, 
+                        tools_to_call_from=self.tools,
+                        tool_choice="auto"
+                    )
+                else:
+                    return self.model(conversation)
+            else:
+                raise
     
     def _build_instructions(self) -> str:
         instructions = self.base_system_prompt

@@ -7,10 +7,10 @@ from world import WORLD_STATE
 
 if __name__ == "__main__":
     agent = InfrastructureRepairAgent()
-    
-    result = agent.run(maxsteps=20)
+
+    result = agent.run(maxsteps=25)
     
     print("\n" + "="*70)
     print("FINAL WORLD STATE")
     print("="*70)
-    print(json.dumps(WORLD_STATE, indent=2))
+    print(json.dumps(WORLD_STATE["nodes"], indent=2))
