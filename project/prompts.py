@@ -5,34 +5,44 @@ from enviroment_tools import OBSERVER_TOOL_REGISTRY
 
 SCHEMA = {
     "type": "object",
-    "tools_called": {
-        "type": "array",
-        "items": {
-            "type": "object",
-            "properties": {
-                "tool_name": {"type": "string"},
-                "parameters": {"type": "object"},
-                "result": {"type": "object"}
-            },
-            "required": ["tool_name", "parameters", "result"]
+    "properties": {
+        "tools_called": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "tool_name": {"type": "string"},
+                    "parameters": {"type": "object"},
+                    "result": {"type": "object"}
+                },
+                "required": ["tool_name", "parameters", "result"],
+                "additionalProperties": False
+            }
+        },
+        "reasoning": {
+            "type": "string",
+        },
+        "final_output": {
+            "type": "string",
+        },
+
+        "transition": {
+            "type": "string",
+            "description": "Return the next state of the agent after completing the tasks. If all tasks are done, return 'GO_IMPACT_ANALYSIS' else do not return this property.",
         }
-    },
-    "reasoning": {
-        "type": "string",
-        "required": "reasoning"
-    },
-    "final_output": {
-        "type": "string",
-        "required": "final_output"
-    },
-    "transition": {
-        "type": "string",
-        "description": "Return the next state of the agent after completing the tasks. If all tasks are done, return 'GO_IMPACT_ANALYSIS' else do not return this property.",
-    },
+    },    
+    "required": ["tools_called", "reasoning", "final_output"],
+    "additionalProperties": False
 }
 
 #Observer(Analyst) 
-observer_system_prompt = (
+system_prompt = (
+
+    "RESPONSE FORMAT (MANDATORY):\n"
+    "You must respond ONLY with a single valid JSON object.\n"
+    "Do NOT include explanations, markdown, comments, or conversational text.\n"
+    "The JSON MUST strictly follow the schema below.\n\n"
+
     "You are the Observer Agent responsible for managing city infrastructure failures.\n"
     "Your tasks include detecting failed nodes, estimating their impact\n"
     "REQUIRED: Use the provided tools to accomplish these tasks effectively."
@@ -44,7 +54,13 @@ observer_system_prompt = (
 )
 
 #Planner(Impact Analyst)
-planner_system_prompt = (
+system_prompt = (
+
+    "RESPONSE FORMAT (MANDATORY):\n"
+    "You must respond ONLY with a single valid JSON object.\n"
+    "Do NOT include explanations, markdown, comments, or conversational text.\n"
+    "The JSON MUST strictly follow the schema below.\n\n"
+
     "You are the IMPACT_ANALYSIS_AGENT responsible for analyzing infrastructure failures and planning optimal repair strategies.\n"
     "You do NOT detect failures yourself. You receive structured failure and impact data from the Observer Agent.\n\n"
 
@@ -62,7 +78,13 @@ planner_system_prompt = (
 )
 
 #Execution(Repair Coordination Agent)
-repair_system_prompt = (
+system_prompt = (
+
+    "RESPONSE FORMAT (MANDATORY):\n"
+    "You must respond ONLY with a single valid JSON object.\n"
+    "Do NOT include explanations, markdown, comments, or conversational text.\n"
+    "The JSON MUST strictly follow the schema below.\n\n"
+
     "You are the EXECUTION_AGENT responsible for coordinating repair crews and executing the approved repair plan.\n\n"
 
     "Your responsibilities:\n"
