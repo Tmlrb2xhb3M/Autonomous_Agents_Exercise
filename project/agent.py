@@ -1,4 +1,5 @@
 from enum import Enum
+import re
 from enviroment_tools import TOOL_REGISTRY
 from smolagents import  InferenceClientModel
 import json
@@ -214,6 +215,21 @@ class Agent:
                 "error": "No error",
                 "observation": "None"
             }
+        
+    def extract_json_object(self, raw: str) -> str:
+        raw=raw.strip()
+        if raw.startswith("{") and raw.endswith("}"):
+            return raw
+        m=re.search(r"\{.*\}", raw, re.DOTALL)
+        if not m:
+            raise ValueError("No JSON object found in model output.")
+        return m.group(0)
+
+    def parse_and_validate(self, raw: str) -> dict[str, any]:
+        txt=self.extract_json_object(raw)
+        obj=json.loads(txt)
+        #self.validate(obj, SCHEMA)
+        return obj
         
 agent = Agent(model=InferenceClientModel())
 agent.run()
