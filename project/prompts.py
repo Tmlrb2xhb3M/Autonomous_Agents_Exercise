@@ -36,7 +36,7 @@ SCHEMA = {
 }
 
 #Observer(Analyst) 
-system_prompt = (
+observer_system_prompt = (
 
     "RESPONSE FORMAT (MANDATORY):\n"
     "You must respond ONLY with a single valid JSON object.\n"
@@ -54,7 +54,7 @@ system_prompt = (
 )
 
 #Planner(Impact Analyst)
-system_prompt = (
+planner_system_prompt = (
 
     "RESPONSE FORMAT (MANDATORY):\n"
     "You must respond ONLY with a single valid JSON object.\n"
@@ -78,7 +78,7 @@ system_prompt = (
 )
 
 #Execution(Repair Coordination Agent)
-system_prompt = (
+execution_system_prompt = (
 
     "RESPONSE FORMAT (MANDATORY):\n"
     "You must respond ONLY with a single valid JSON object.\n"

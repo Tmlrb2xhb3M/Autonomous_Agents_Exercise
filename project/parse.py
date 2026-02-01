@@ -21,7 +21,7 @@ def parse_llm_output(raw_output: str, schema: dict) -> dict:
     Raises:
         LLMOutputParsingError: If parsing or validation fails.
     """
-    # 1️⃣ JSON parsing
+    # JSON parsing
     try:
         parsed = json.loads(raw_output)
     except json.JSONDecodeError as e:
@@ -29,7 +29,7 @@ def parse_llm_output(raw_output: str, schema: dict) -> dict:
             f"LLM returned invalid JSON:\n{raw_output}"
         ) from e
 
-    # 2️⃣ Schema validation
+    # Schema validation
     try:
         validate(instance=parsed, schema=schema)
     except ValidationError as e:
