@@ -1,41 +1,26 @@
 import json
-from llm import llm_call
-from world import WORLD_STATE
-from enviroment_tools import OBSERVER_TOOL_REGISTRY
 
 SCHEMA = {
+    "$schema": "http://json-schema.org/draft-07/schema#",
     "type": "object",
     "properties": {
-        "tools_called": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "tool_name": {"type": "string"},
-                    "parameters": {"type": "object"},
-                    "result": {"type": "object"}
-                },
-                "required": ["tool_name", "parameters", "result"],
-                "additionalProperties": False
-            }
-        },
         "reasoning": {
             "type": "string",
+            "description": "Explanation of the reasoning process and decisions made"
         },
         "final_output": {
             "type": "string",
+            "description": "Final summary or report output"
         },
-
         "transition": {
             "type": "string",
-            "description": "Return the next state of the agent after completing the tasks. If all tasks are done, return 'GO_IMPACT_ANALYSIS' else do not return this property.",
+            "description": "Next state/agent to transition to (e.g., 'GO_IMPACT_ANALYSIS'). Optional field."
         }
-    },    
-    "required": ["tools_called", "reasoning", "final_output"],
-    "additionalProperties": False
+    },
+    "required": ["reasoning", "final_output"]
 }
 
-#Observer(Analyst) 
+# Observer (Analyst) 
 observer_system_prompt = (
 
     "RESPONSE FORMAT (MANDATORY):\n"
@@ -44,13 +29,16 @@ observer_system_prompt = (
     "The JSON MUST strictly follow the schema below.\n\n"
 
     "You are the Observer Agent responsible for managing city infrastructure failures.\n"
-    "Your tasks include detecting failed nodes, estimating their impact\n"
-    "REQUIRED: Use the provided tools to accomplish these tasks effectively."
-    "Your goal each time is to: Detect failed nodes, estimate impact, gather all info, and prepare\n"
-    "a report for the IMPACT_ANALYSIS_AGENT agent presenting the data retrieved \n"
-    "to be able to use this and estimate himself for what is the impact of the current state of the infrastructure.\n"
-    "OUTPUT: A JSON object with the following structure:\n"
-    f"{json.dumps(SCHEMA, indent=2)}\n"
+    "Your tasks include detecting failed nodes and estimating their impact.\n"
+    "CRITICAL: You MUST use the provided tools to accomplish these tasks.\n"
+    "Call the tools using function calling - do NOT simulate or describe tool calls.\n\n"
+    
+    "Your goal:\n"
+    "1. Use detect_failure_nodes() to find failed infrastructure nodes\n"
+    "2. Use estimate_impact() for each failed node to assess impact\n"
+    "3. After gathering all information, provide your final analysis in JSON format\n\n"
+    
+    "FINAL RESPONSE FORMAT (after tools are called):\n"
 )
 
 #Planner(Impact Analyst)
@@ -74,10 +62,9 @@ planner_system_prompt = (
     "- Do NOT call assign_repair_crew.\n"
     "- Do NOT invent new failure nodes.\n"
     "- Reason explicitly about trade-offs (e.g., high population vs critical infrastructure).\n\n"
-    f"{json.dumps(SCHEMA, indent=2)}\n"
 )
 
-#Execution(Repair Coordination Agent)
+# Execution (Repair Coordination Agent)
 execution_system_prompt = (
 
     "RESPONSE FORMAT (MANDATORY):\n"
@@ -97,7 +84,6 @@ execution_system_prompt = (
     "- You MUST use the assign_repair_crew tool to perform execution.\n"
     "- You must respect crew availability and feasibility constraints.\n"
     "- If execution fails, report clearly which assignments failed and why.\n\n"
-    f"{json.dumps(SCHEMA, indent=2)}\n"
 )
 
 prompt = (
