@@ -42,7 +42,7 @@ STATES_CONFIGS = {
                 "transition": {
                     "type": "string",
                     "description": "Next state to transition to (only if ready)",
-                    "enum": ["IMPACT_ANALYSIS"]
+                    "enum": ["FAILURE_DETECTION", "IMPACT_ANALYSIS"]
                 }
             },
             "required": ["reasoning", "failed_nodes"]
@@ -95,7 +95,7 @@ STATES_CONFIGS = {
                 "transition": {
                     "type": "string",
                     "description": "Next state to transition to (only if ready)",
-                    "enum": ["REPAIR_PLANNING"]
+                    "enum": ["IMPACT_ANALYSIS", "REPAIR_PLANNING"]
                 }
             },
             "required": ["reasoning", "priority_list"]

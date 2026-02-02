@@ -167,7 +167,7 @@ class InfrastructureRepairAgent:
         }
     
     # Main Run LLM Loop With Retries and Tool Handling
-    def _run_llm(self, state_name: str, state_config: Dict[str, Any], prompt: str, max_retries: int = 2) -> Dict[str, Any]:
+    def _run_llm(self, state_name: str, state_config: Dict[str, Any], prompt: str, max_retries: int = 3) -> Dict[str, Any]:
         # Create a local copy of history for tool interactions
         local_history = self.history.copy()
         
@@ -191,7 +191,6 @@ class InfrastructureRepairAgent:
                 if attempt < max_retries - 1:
                     error_feedback = f"JSON parse error: {str(je)}. Please provide valid JSON only."
                     self._update_local_history(local_history, "user", error_feedback)
-                    prompt = "Respond with ONLY a valid JSON object. No text before or after. No markdown. Just pure JSON starting with {{ and ending with }}."
                 else:
                     raise
             except ValidationError as ve:
@@ -199,7 +198,6 @@ class InfrastructureRepairAgent:
                     error_msg = f"Schema validation failed: {ve.message}"
                     error_feedback = f"Validation error: {error_msg}. Please fix the JSON response to match the schema exactly."
                     self._update_local_history(local_history, "user", error_feedback)
-                    prompt = "Please provide the response again, ensuring it matches the required JSON schema."
                 else:
                     raise
         
